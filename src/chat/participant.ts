@@ -57,6 +57,8 @@ function createHandler(
         return handleSync(engine, stream);
       case 'new':
         return handleNew(engine, stream, cleanPrompt);
+      case 'reset':
+        return handleReset(engine, stream);
       default:
         if (cleanPrompt) {
           return handleRun(engine, cleanPrompt, maxAgents, stream, token, repoOverride);
@@ -72,7 +74,8 @@ function createHandler(
           '- `/amend` — дополнить ТЗ задачи\n' +
           '- `/agents` — список агентов и навыков\n' +
           '- `/sync` — синхронизировать рабочую область (git pull)\n' +
-          '- `/new` — создать ручную сессию (без GitHub API)\n\n' +
+          '- `/new` — создать ручную сессию (без GitHub API)\n' +
+          '- `/reset` — сбросить текущую сессию\n\n' +
           'Пример: `@fleet Оптимизируй UI --agents 3`'
         );
         return {};
@@ -334,6 +337,25 @@ async function handleNew(
     command: 'copilot-fleet.openWorkflow',
     title: 'Открыть редактор потока',
   });
+  return {};
+}
+
+function handleReset(
+  engine: FleetEngine,
+  stream: vscode.ChatResponseStream
+): vscode.ChatResult {
+  const session = engine.session;
+  if (!session) {
+    stream.markdown('Нет активной сессии для сброса.');
+    return {};
+  }
+  const status = session.status;
+  const taskCount = session.tasks.length;
+  engine.reset();
+  stream.markdown(
+    `Сессия сброшена (была в статусе **${status}**, ${taskCount} задач).\n\n` +
+    `Используйте \`@fleet /plan\` или \`@fleet /new\` для нового запуска.`
+  );
   return {};
 }
 

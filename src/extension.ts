@@ -55,6 +55,9 @@ export function activate(context: vscode.ExtensionContext): void {
       engine.reset();
       sidebarProvider.update(undefined);
     }),
+    vscode.commands.registerCommand('copilot-fleet.forceComplete', () => {
+      engine.forceComplete();
+    }),
     vscode.commands.registerCommand('copilot-fleet.mergePR', async (taskId: string) => {
       try {
         await engine.mergePR(taskId);

@@ -175,6 +175,20 @@ export class FleetEngine {
     this.monitor.stop(); this.state.abort(); this.logger.info('Session aborted');
   }
 
+  /** Force-complete the current session regardless of task statuses */
+  forceComplete(): void {
+    this.monitor.stop();
+    const session = this.state.session;
+    if (!session) { return; }
+    for (const task of session.tasks) {
+      if (task.status === 'working' || task.status === 'dispatched' || task.status === 'pending') {
+        task.status = task.prNumber ? 'pr_created' : task.issueNumber ? 'completed' : 'aborted';
+      }
+    }
+    this.state.setStatus('completed');
+    this.logger.info('Session force-completed');
+  }
+
   reset(): void {
     this.monitor.stop(); this.state.reset(); this.logger.info('Session reset');
   }
@@ -259,6 +273,21 @@ export class FleetEngine {
       catch (err) { vscode.window.showErrorMessage(`Fleet: ${err}`); }
       finally { tokenSource.dispose(); }
       return;
+    }
+
+    // Clear running/stuck session — offer to reset
+    if (existing && (existing.status === 'running' || existing.status === 'planning')) {
+      const choice = await vscode.window.showWarningMessage(
+        `Fleet: Есть активная сессия (${existing.status}). Сбросить и начать новую?`,
+        { modal: true },
+        'Сбросить',
+        'Завершить принудительно'
+      );
+      if (choice === 'Завершить принудительно') {
+        this.forceComplete();
+        return;
+      }
+      if (choice !== 'Сбросить') { return; }
     }
 
     // Clear terminal session so a new one can start

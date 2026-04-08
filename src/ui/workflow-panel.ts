@@ -29,6 +29,12 @@ export class WorkflowPanel {
         case 'amendTask': vscode.commands.executeCommand('copilot-fleet.amendTask', msg.taskId, msg.value); break;
         case 'launch': vscode.commands.executeCommand('copilot-fleet.launch'); break;
         case 'syncWorkspace': vscode.commands.executeCommand('copilot-fleet.syncWorkspace'); break;
+        case 'forceComplete': vscode.commands.executeCommand('copilot-fleet.forceComplete'); break;
+        case 'resetSession': {
+          this.engine.reset();
+          this.update(undefined);
+          break;
+        }
         case 'createSession': {
           try {
             const s = this.engine.createManualSession(msg.prompt, msg.repo, msg.branch);
@@ -263,6 +269,8 @@ box-shadow:0 2px 12px rgba(0,0,0,.2);cursor:pointer;transition:border-color .2s,
     </div>
     <button id="btnAddTask" class="btn btn-secondary" style="display:none" onclick="addNewTask()">${SVG.plus} Задача</button>
     <button id="btnLaunch" class="btn btn-launch" style="display:none" onclick="send('launch')">${SVG.rocket} Запустить агентов</button>
+    <button id="btnForceComplete" class="btn btn-secondary" style="display:none" onclick="send('forceComplete')">${SVG.check} Завершить</button>
+    <button id="btnReset" class="btn btn-secondary" style="display:none" onclick="confirmReset()">${SVG.close} Сбросить</button>
     <button id="btnMergeAll" class="btn btn-success" style="display:none" onclick="send('mergeAll')">${SVG.gitMerge} Merge All</button>
     <button id="btnSync" class="btn btn-sync" style="display:none" onclick="send('syncWorkspace')">${SVG.sync} Sync to Workspace</button>
     <button class="btn btn-secondary" onclick="resetView()">${SVG.sync} Reset View</button>
@@ -463,6 +471,12 @@ function updateToolbar(){
 
   // Launch button: only in planning/approval phase with tasks
   document.getElementById('btnLaunch').style.display=(isPlanning&&total>0)?'':'none';
+
+  // Force complete: when running (to unstick)
+  document.getElementById('btnForceComplete').style.display=isRunning?'':'none';
+
+  // Reset: always show when there is a session (to start fresh)
+  document.getElementById('btnReset').style.display=(session)?'':'none';
 
   // Merge All: when there are PRs ready
   document.getElementById('btnMergeAll').style.display=hasPRs?'':'none';
@@ -893,6 +907,13 @@ function deleteTask(taskId){
   closeDetail();
   // Clear saved positions for removed node
   delete nodePositions[taskId];
+}
+
+function confirmReset(){
+  if(!confirm('Сбросить текущую сессию? Все задачи будут потеряны.'))return;
+  send('resetSession');
+  nodePositions={};
+  selectedNode=null;
 }
 
 function saveField(taskId,field,value){

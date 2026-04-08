@@ -68,6 +68,10 @@
           {
             "name": "new",
             "description": "Создать ручную сессию (без GitHub API)"
+          },
+          {
+            "name": "reset",
+            "description": "Сбросить текущую сессию"
           }
         ]
       }
@@ -149,6 +153,12 @@
         "command": "copilot-fleet.newSession",
         "title": "Fleet: Новая ручная сессия",
         "icon": "$(new-file)",
+        "category": "Copilot Fleet"
+      },
+      {
+        "command": "copilot-fleet.forceComplete",
+        "title": "Fleet: Завершить сессию принудительно",
+        "icon": "$(check-all)",
         "category": "Copilot Fleet"
       }
     ],

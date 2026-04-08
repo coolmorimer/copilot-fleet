@@ -171,10 +171,12 @@ export class Monitor {
     const done = session.tasks.filter(
       t => t.status === 'completed' || t.status === 'pr_created'
     ).length;
-    const failed = session.tasks.filter(t => t.status === 'failed').length;
+    const terminal = session.tasks.filter(
+      t => t.status === 'failed' || t.status === 'aborted'
+    ).length;
 
-    if (done + failed === all && all > 0) {
-      this.state.setStatus(failed > 0 ? 'failed' : 'completed');
+    if (done + terminal === all && all > 0) {
+      this.state.setStatus(terminal > 0 && done === 0 ? 'failed' : 'completed');
       this.stop();
     }
   }
