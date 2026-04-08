@@ -1,0 +1,301 @@
+{
+  "name": "copilot-fleet",
+  "displayName": "Copilot Fleet — Cloud Agent Orchestrator",
+  "description": "Запускайте параллельные облачные агенты GitHub Copilot прямо из чата VS Code. Разбивает задачу на подзадачи, создаёт Issues, назначает copilot-swe-agent.",
+  "version": "1.0.0",
+  "publisher": "coolmorimer",
+  "engines": {
+    "vscode": "^1.109.0"
+  },
+  "categories": [
+    "AI",
+    "Chat",
+    "Other"
+  ],
+  "keywords": [
+    "copilot",
+    "agents",
+    "orchestration",
+    "fleet",
+    "parallel"
+  ],
+  "icon": "media/fleet-icon.png",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "chatParticipants": [
+      {
+        "id": "copilot-fleet.fleet",
+        "name": "fleet",
+        "fullName": "Copilot Fleet Orchestrator",
+        "description": "Запускает параллельные облачные агенты GitHub Copilot",
+        "isSticky": false,
+        "commands": [
+          {
+            "name": "run",
+            "description": "Запустить облачных агентов для задачи"
+          },
+          {
+            "name": "status",
+            "description": "Показать статус текущей сессии"
+          },
+          {
+            "name": "plan",
+            "description": "Показать план без запуска (dry run)"
+          },
+          {
+            "name": "abort",
+            "description": "Остановить текущую сессию"
+          },
+          {
+            "name": "merge",
+            "description": "Смержить PR (все или по ID задачи)"
+          },
+          {
+            "name": "amend",
+            "description": "Дополнить ТЗ активных задач"
+          },
+          {
+            "name": "agents",
+            "description": "Список агентов и навыков"
+          },
+          {
+            "name": "sync",
+            "description": "Синхронизировать рабочую область (git pull)"
+          },
+          {
+            "name": "new",
+            "description": "Создать ручную сессию (без GitHub API)"
+          }
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "copilot-fleet.launch",
+        "title": "Fleet: Запустить облачных агентов",
+        "icon": "$(rocket)",
+        "category": "Copilot Fleet"
+      },
+      {
+        "command": "copilot-fleet.dryRun",
+        "title": "Fleet: Показать план (Dry Run)",
+        "icon": "$(list-tree)",
+        "category": "Copilot Fleet"
+      },
+      {
+        "command": "copilot-fleet.status",
+        "title": "Fleet: Статус сессии",
+        "icon": "$(pulse)",
+        "category": "Copilot Fleet"
+      },
+      {
+        "command": "copilot-fleet.abort",
+        "title": "Fleet: Остановить сессию",
+        "icon": "$(debug-stop)",
+        "category": "Copilot Fleet"
+      },
+      {
+        "command": "copilot-fleet.openDashboard",
+        "title": "Fleet: Открыть дашборд",
+        "icon": "$(dashboard)",
+        "category": "Copilot Fleet"
+      },
+      {
+        "command": "copilot-fleet.history",
+        "title": "Fleet: История сессий",
+        "icon": "$(history)",
+        "category": "Copilot Fleet"
+      },
+      {
+        "command": "copilot-fleet.openWorkflow",
+        "title": "Fleet: Редактор потока",
+        "icon": "$(type-hierarchy)",
+        "category": "Copilot Fleet"
+      },
+      {
+        "command": "copilot-fleet.amendTask",
+        "title": "Fleet: Дополнить ТЗ задачи",
+        "icon": "$(edit)",
+        "category": "Copilot Fleet"
+      },
+      {
+        "command": "copilot-fleet.reset",
+        "title": "Fleet: Новая сессия",
+        "icon": "$(refresh)",
+        "category": "Copilot Fleet"
+      },
+      {
+        "command": "copilot-fleet.syncWorkspace",
+        "title": "Fleet: Синхронизировать рабочую область",
+        "icon": "$(cloud-download)",
+        "category": "Copilot Fleet"
+      },
+      {
+        "command": "copilot-fleet.addTask",
+        "title": "Fleet: Добавить задачу",
+        "icon": "$(add)",
+        "category": "Copilot Fleet"
+      },
+      {
+        "command": "copilot-fleet.removeTask",
+        "title": "Fleet: Удалить задачу",
+        "icon": "$(trash)",
+        "category": "Copilot Fleet"
+      },
+      {
+        "command": "copilot-fleet.newSession",
+        "title": "Fleet: Новая ручная сессия",
+        "icon": "$(new-file)",
+        "category": "Copilot Fleet"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "copilot-fleet",
+          "title": "Copilot Fleet",
+          "icon": "media/fleet-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "copilot-fleet": [
+        {
+          "type": "webview",
+          "id": "copilot-fleet.dashboard",
+          "name": "Fleet Dashboard"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Copilot Fleet",
+      "properties": {
+        "copilot-fleet.agents.max": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Максимальное количество параллельных облачных агентов"
+        },
+        "copilot-fleet.agents.concurrency": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Сколько агентов запускать одновременно"
+        },
+        "copilot-fleet.agents.delayMs": {
+          "type": "number",
+          "default": 3000,
+          "description": "Задержка между запусками агентов (мс)"
+        },
+        "copilot-fleet.preset": {
+          "type": "string",
+          "default": "squad",
+          "enum": [
+            "solo",
+            "squad",
+            "platoon",
+            "fleet"
+          ],
+          "enumDescriptions": [
+            "1 агент, последовательно",
+            "2-3 агента, пауза 5сек (рекомендуется для Pro)",
+            "4-6 агентов, пауза 3сек (Pro+)",
+            "7-10 агентов, без пауз (Enterprise)"
+          ],
+          "description": "Пресет количества агентов"
+        },
+        "copilot-fleet.target.repo": {
+          "type": "string",
+          "default": "",
+          "description": "Целевой репозиторий по умолчанию (owner/repo). Если пусто — берётся из текущего workspace."
+        },
+        "copilot-fleet.target.branch": {
+          "type": "string",
+          "default": "main",
+          "description": "Целевая ветка по умолчанию"
+        },
+        "copilot-fleet.decomposer.model": {
+          "type": "string",
+          "default": "gpt-4o-mini",
+          "description": "Модель для декомпозиции задачи"
+        },
+        "copilot-fleet.monitor.pollIntervalMs": {
+          "type": "number",
+          "default": 30000,
+          "description": "Интервал проверки статуса PR (мс)"
+        },
+        "copilot-fleet.monitor.timeoutMs": {
+          "type": "number",
+          "default": 3600000,
+          "description": "Таймаут ожидания PR (мс, default: 60 мин)"
+        },
+        "copilot-fleet.pipeline.enableDependencies": {
+          "type": "boolean",
+          "default": true,
+          "description": "Включить DAG-зависимости между подзадачами"
+        },
+        "copilot-fleet.pipeline.requireApproval": {
+          "type": "boolean",
+          "default": true,
+          "description": "Требовать подтверждения перед запуском агентов"
+        },
+        "copilot-fleet.pipeline.autoMergePRs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Автоматически мержить PR после ревью"
+        }
+      }
+    },
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "copilot-fleet.launch"
+        },
+        {
+          "command": "copilot-fleet.dryRun"
+        },
+        {
+          "command": "copilot-fleet.status"
+        },
+        {
+          "command": "copilot-fleet.abort"
+        },
+        {
+          "command": "copilot-fleet.openDashboard"
+        },
+        {
+          "command": "copilot-fleet.history"
+        },
+        {
+          "command": "copilot-fleet.openWorkflow"
+        },
+        {
+          "command": "copilot-fleet.reset"
+        },
+        {
+          "command": "copilot-fleet.syncWorkspace"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "tsc --noEmit",
+    "test": "node ./out/test/runTest.js",
+    "package": "npx @vscode/vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.109.0",
+    "@vscode/test-electron": "^2.4.0",
+    "typescript": "^5.5.0"
+  }
+}
