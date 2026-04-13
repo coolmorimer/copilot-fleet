@@ -37,6 +37,12 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api\/proxy\/github-api/, ''),
         secure: true,
       },
+      '/api/proxy/github-models': {
+        target: 'https://models.inference.ai.azure.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/proxy\/github-models/, ''),
+        secure: true,
+      },
       '/api/proxy/ollama': {
         target: 'http://localhost:11434',
         changeOrigin: true,
@@ -52,5 +58,22 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          flow: ['@xyflow/react'],
+          radix: [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-select',
+            '@radix-ui/react-slider',
+            '@radix-ui/react-switch',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-tooltip',
+            '@radix-ui/react-scroll-area',
+          ],
+        },
+      },
+    },
   },
 });

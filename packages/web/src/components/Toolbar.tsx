@@ -8,7 +8,7 @@ import { useGraphStore } from '../store/graph-store.js';
 import { getLatestSession, saveSessionRecord } from '../store/history.js';
 import { useSessionStore } from '../store/session-store.js';
 import { useSettingsStore } from '../store/settings-store.js';
-import { createStarterTemplate } from '../store/starter-templates.js';
+import { createAutoTaskTemplate, createStarterTemplate } from '../store/starter-templates.js';
 import { useT } from '../i18n/useT.js';
 
 interface ToolbarProps {
@@ -49,6 +49,14 @@ export function Toolbar({ onOpenSettings, onOpenGuide }: ToolbarProps): ReactEle
   const updateElapsed = useSessionStore((state) => state.updateElapsed);
   const executorRef = useRef<GraphExecutor>(new GraphExecutor());
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [runPrompt, setRunPrompt] = useState('');
+  const [repository, setRepository] = useState('');
+  const [repoApiOpen, setRepoApiOpen] = useState(false);
+  const [repoLoading, setRepoLoading] = useState(false);
+  const [repoError, setRepoError] = useState('');
+  const [repoItems, setRepoItems] = useState<Array<{ id: number; full_name: string; private: boolean }>>([]);
+  const [newRepoName, setNewRepoName] = useState('');
+  const [newRepoPrivate, setNewRepoPrivate] = useState(false);
   const completedCount = nodes.filter((node) => node.data.status === 'done').length;
   const totalCount = nodes.length;
   const running = status === 'running';
@@ -68,11 +76,47 @@ export function Toolbar({ onOpenSettings, onOpenGuide }: ToolbarProps): ReactEle
     };
   }, [running, startedAt, updateElapsed]);
 
-  const startRun = (): void => {
-    if (nodes.length === 0) return;
+  const startRun = async (): Promise<void> => {
+    const graphStore = useGraphStore.getState();
+    let finalPrompt = runPrompt.trim();
+    const currentRepo = repository.trim();
+    const providers = useSettingsStore.getState().providers;
 
+    if (!finalPrompt) {
+      const asked = window.prompt('Опишите задачу одним сообщением. Граф выполнится автоматически.', 'Исправь баг, добавь тесты и подготовь краткий отчёт');
+      if (!asked || !asked.trim()) {
+        return;
+      }
+      finalPrompt = asked.trim();
+      setRunPrompt(finalPrompt);
+    }
+
+    const isDefaultQuickFix = graphStore.graphName === 'Quick Fix' && graphStore.nodes.length <= 3;
+    if (graphStore.nodes.length === 0 || isDefaultQuickFix) {
+      addLog({
+        type: 'log',
+        sessionId: graphStore.graphId,
+        timestamp: new Date().toISOString(),
+        data: { message: 'Формирую команду агентов под задачу…' },
+      });
+      const graph = await createAutoTaskTemplate(finalPrompt, providers, currentRepo || undefined);
+      graphStore.loadGraph(graph);
+      addLog({
+        type: 'log',
+        sessionId: graphStore.graphId,
+        timestamp: new Date().toISOString(),
+        data: {
+          message: `Команда сформирована: ${graph.nodes.filter((n) => n.type === 'agent').map((n) => n.label).join(', ')}`,
+        },
+      });
+    }
+
+    const nodesSnapshot = useGraphStore.getState().nodes;
+    if (nodesSnapshot.length === 0) return;
+
+    const activeGraphId = useGraphStore.getState().graphId;
     resetSession();
-    startSession(graphId, Math.max(nodes.length, 1));
+    startSession(activeGraphId, Math.max(nodesSnapshot.length, 1));
 
     const currentEdges = useGraphStore.getState().edges;
     const updateEdgeAnimation = (sourceId: string, animated: boolean): void => {
@@ -87,16 +131,22 @@ export function Toolbar({ onOpenSettings, onOpenGuide }: ToolbarProps): ReactEle
     void executorRef.current.execute(
       useGraphStore.getState().nodes,
       currentEdges,
-      graphId,
+      activeGraphId,
       {
         updateNodeStatus: (id, status, progress) => useGraphStore.getState().updateNodeStatus(id, status, progress),
+        updateNodeData: (id, data) => useGraphStore.getState().updateNodeData(id, data),
         addLog: (event) => useSessionStore.getState().addLog(event),
+        addResult: (nodeId, result) => useSessionStore.getState().addResult(nodeId, result),
         advanceWave: () => useSessionStore.getState().advanceWave(),
         completeSession: () => useSessionStore.getState().completeSession(),
         failSession: (error) => useSessionStore.getState().failSession(error),
         updateEdgeAnimation,
       },
-      { providers: useSettingsStore.getState().providers },
+      {
+        providers,
+        runPrompt: finalPrompt,
+        repository: currentRepo,
+      },
     );
   };
 
@@ -130,11 +180,121 @@ export function Toolbar({ onOpenSettings, onOpenGuide }: ToolbarProps): ReactEle
     loadGraph(latest.graph);
   };
 
+  const fetchRepos = async (): Promise<void> => {
+    const token = useSettingsStore.getState().providers.find((p) => p.type === 'github-copilot')?.apiKey;
+    if (!token) {
+      setRepoError('Добавьте GitHub токен в Настройки → Providers → GitHub Copilot.');
+      return;
+    }
+
+    setRepoLoading(true);
+    setRepoError('');
+    try {
+      const res = await fetch('/api/proxy/github-api/user/repos?per_page=100&sort=updated', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+        },
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`GitHub API ${res.status}: ${text || res.statusText}`);
+      }
+      const data = (await res.json()) as Array<{ id: number; full_name: string; private: boolean }>;
+      setRepoItems(data);
+    } catch (err) {
+      setRepoError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRepoLoading(false);
+    }
+  };
+
+  const createRepo = async (): Promise<void> => {
+    const token = useSettingsStore.getState().providers.find((p) => p.type === 'github-copilot')?.apiKey;
+    const name = newRepoName.trim();
+    if (!token) {
+      setRepoError('Добавьте GitHub токен в Настройки → Providers → GitHub Copilot.');
+      return;
+    }
+    if (!name) {
+      setRepoError('Введите имя нового репозитория.');
+      return;
+    }
+
+    setRepoLoading(true);
+    setRepoError('');
+    try {
+      const res = await fetch('/api/proxy/github-api/user/repos', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/vnd.github+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          private: newRepoPrivate,
+          auto_init: true,
+        }),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`GitHub API ${res.status}: ${text || res.statusText}`);
+      }
+      const created = (await res.json()) as { full_name?: string };
+      if (created.full_name) {
+        setRepository(created.full_name);
+      }
+      setNewRepoName('');
+      await fetchRepos();
+    } catch (err) {
+      setRepoError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRepoLoading(false);
+    }
+  };
+
   return (
     <header className="relative flex h-12 items-center gap-3 border-b border-fleet-border bg-fleet-surface px-3 md:px-4">
       <div className="flex min-w-0 shrink-0 items-center gap-1.5 text-sm font-semibold text-white"><Zap size={14} className="text-fleet-accent" /> CopilotFleet</div>
       <div className="flex min-w-0 flex-1 items-center justify-center gap-2 overflow-x-auto">
-        <ToolbarButton label={t('toolbar.run')} icon={<Play size={16} />} active={running} tone="success" onClick={startRun} />
+        <input
+          value={runPrompt}
+          onChange={(event) => setRunPrompt(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault();
+              void startRun();
+            }
+          }}
+          placeholder={t('toolbar.promptPlaceholder')}
+          className="min-h-11 w-64 min-w-40 rounded-xl border border-fleet-border bg-fleet-panel px-3 text-sm text-fleet-text outline-none placeholder:text-fleet-muted focus:border-fleet-accent"
+        />
+        <input
+          value={repository}
+          onChange={(event) => setRepository(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault();
+              void startRun();
+            }
+          }}
+          placeholder={t('toolbar.repoPlaceholder')}
+          className="min-h-11 w-56 min-w-36 rounded-xl border border-fleet-border bg-fleet-panel px-3 text-sm text-fleet-text outline-none placeholder:text-fleet-muted focus:border-fleet-accent"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            setRepoApiOpen((prev) => !prev);
+            if (!repoApiOpen) {
+              void fetchRepos();
+            }
+          }}
+          className="flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-fleet-border bg-fleet-panel px-3 text-sm text-fleet-text transition hover:border-fleet-accent hover:text-white"
+        >
+          {t('toolbar.repoApi')}
+        </button>
+        <ToolbarButton label={t('toolbar.run')} icon={<Play size={16} />} active={running} tone="success" onClick={() => void startRun()} />
         <ToolbarButton label={t('toolbar.stop')} icon={<Square size={16} />} onClick={stopRun} />
         <ToolbarButton label={t('toolbar.save')} icon={<Save size={16} />} onClick={saveGraph} />
         <ToolbarButton label={t('toolbar.load')} icon={<FolderOpen size={16} />} onClick={loadLatest} />
@@ -171,7 +331,7 @@ export function Toolbar({ onOpenSettings, onOpenGuide }: ToolbarProps): ReactEle
               type="button"
               onClick={() => {
                 resetSession();
-                loadGraph(createStarterTemplate(option.id));
+                loadGraph(createStarterTemplate(option.id, { providers: useSettingsStore.getState().providers }));
                 setTemplatesOpen(false);
               }}
               className="flex min-h-11 w-full items-center rounded-xl px-3 py-2 text-left text-sm text-fleet-text transition hover:bg-fleet-panel/70"
@@ -179,6 +339,77 @@ export function Toolbar({ onOpenSettings, onOpenGuide }: ToolbarProps): ReactEle
               {t(option.tKey)}
             </button>
           ))}
+        </div>
+      ) : null}
+      {repoApiOpen ? (
+        <div className="absolute left-1/2 top-12 z-20 mt-2 w-[32rem] -translate-x-1/2 rounded-2xl border border-fleet-border bg-fleet-surface p-3 shadow-2xl">
+          <div className="mb-2 text-sm font-semibold text-fleet-text">GitHub API: выбор или создание репозитория</div>
+          <div className="mb-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => void fetchRepos()}
+              disabled={repoLoading}
+              className="rounded-lg border border-fleet-border bg-fleet-panel px-3 py-2 text-xs text-fleet-text transition hover:border-fleet-accent disabled:opacity-60"
+            >
+              Обновить список
+            </button>
+            <button
+              type="button"
+              onClick={() => setRepoApiOpen(false)}
+              className="rounded-lg border border-fleet-border bg-fleet-panel px-3 py-2 text-xs text-fleet-text transition hover:border-fleet-accent"
+            >
+              Закрыть
+            </button>
+          </div>
+
+          <div className="mb-3 max-h-48 space-y-1 overflow-y-auto rounded-xl border border-fleet-border bg-fleet-bg/40 p-2">
+            {repoLoading ? <div className="text-xs text-fleet-muted">Загрузка репозиториев…</div> : null}
+            {!repoLoading && repoItems.length === 0 ? <div className="text-xs text-fleet-muted">Репозитории не найдены.</div> : null}
+            {!repoLoading ? repoItems.map((repo) => (
+              <button
+                key={repo.id}
+                type="button"
+                onClick={() => {
+                  setRepository(repo.full_name);
+                  setRepoApiOpen(false);
+                }}
+                className="flex w-full items-center justify-between rounded-lg border border-fleet-border bg-fleet-panel px-3 py-2 text-left text-xs text-fleet-text transition hover:border-fleet-accent"
+              >
+                <span>{repo.full_name}</span>
+                <span className="text-fleet-muted">{repo.private ? 'private' : 'public'}</span>
+              </button>
+            )) : null}
+          </div>
+
+          <div className="rounded-xl border border-fleet-border bg-fleet-bg/40 p-2">
+            <div className="mb-2 text-xs uppercase tracking-[0.14em] text-fleet-muted">Создать новый репозиторий</div>
+            <div className="flex items-center gap-2">
+              <input
+                value={newRepoName}
+                onChange={(event) => setNewRepoName(event.target.value)}
+                placeholder="new-repository-name"
+                className="min-h-10 flex-1 rounded-lg border border-fleet-border bg-fleet-panel px-3 text-xs text-fleet-text outline-none placeholder:text-fleet-muted focus:border-fleet-accent"
+              />
+              <label className="flex items-center gap-2 rounded-lg border border-fleet-border bg-fleet-panel px-3 py-2 text-xs text-fleet-text">
+                <input
+                  type="checkbox"
+                  checked={newRepoPrivate}
+                  onChange={(event) => setNewRepoPrivate(event.target.checked)}
+                />
+                private
+              </label>
+              <button
+                type="button"
+                onClick={() => void createRepo()}
+                disabled={repoLoading}
+                className="rounded-lg bg-fleet-accent px-3 py-2 text-xs text-white transition hover:brightness-110 disabled:opacity-60"
+              >
+                Создать
+              </button>
+            </div>
+          </div>
+
+          {repoError ? <div className="mt-2 text-xs text-red-300">{repoError}</div> : null}
         </div>
       ) : null}
     </header>

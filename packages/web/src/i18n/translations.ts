@@ -49,6 +49,9 @@ export const translations = {
   'toolbar.featureSquad': { en: 'Feature Squad', ru: 'Команда фичи' },
   'toolbar.fullstackTeam': { en: 'Fullstack Team', ru: 'Fullstack-команда' },
   'toolbar.empty': { en: 'Empty', ru: 'Пустой' },
+  'toolbar.promptPlaceholder': { en: 'Describe task in one prompt…', ru: 'Опишите задачу одним промтом…' },
+  'toolbar.repoPlaceholder': { en: 'Repository (owner/repo, optional)', ru: 'Репозиторий (owner/repo, опционально)' },
+  'toolbar.repoApi': { en: 'Repo API', ru: 'Репо API' },
 
   /* ── Sidebar ──────────────────────────────────────────── */
   'sidebar.nodePalette': { en: 'Node Palette', ru: 'Палитра нод' },

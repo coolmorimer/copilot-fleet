@@ -58,12 +58,26 @@ function buildMessages(systemPrompt: string | undefined, messages: LLMMessage[])
 }
 
 async function post(url: string, body: unknown, headers: Record<string, string>, signal?: AbortSignal): Promise<unknown> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...headers },
-    body: JSON.stringify(body),
-    signal,
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch (networkErr) {
+    // Distinguish CORS / network failures from other errors
+    const msg = networkErr instanceof Error ? networkErr.message : String(networkErr);
+    if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('CORS')) {
+      throw new Error(
+        `Сетевая ошибка при запросе к ${url}. ` +
+        `Убедитесь, что web-приложение запущено через "pnpm dev" (Vite dev server с proxy). ` +
+        `В режиме preview/production прямые API-вызовы блокируются CORS.`,
+      );
+    }
+    throw networkErr;
+  }
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -71,10 +85,11 @@ async function post(url: string, body: unknown, headers: Record<string, string>,
       throw new Error(`Ошибка авторизации (${res.status}): проверьте API-ключ. ${text}`);
     }
     if (res.status === 404) {
-      throw new Error(`Endpoint не найден (404): ${url}`);
+      throw new Error(`Endpoint не найден (404): ${url}. Проверьте, что Vite dev proxy работает.`);
     }
     if (res.status === 429) {
-      throw new Error(`Лимит запросов превышен (429). Подождите и попробуйте снова.`);
+      const retryAfter = res.headers.get('retry-after') ?? res.headers.get('x-ratelimit-reset-requests') ?? '';
+      throw new Error(`Лимит запросов превышен (429).${retryAfter ? ` Retry-After: ${retryAfter}s.` : ''} Подождите и попробуйте снова.`);
     }
     throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
   }
@@ -118,8 +133,8 @@ async function openaiComplete(req: CompletionRequest): Promise<LLMResponse> {
   const body = {
     model: req.model,
     messages: buildMessages(req.systemPrompt, req.messages).map((m) => ({ role: m.role, content: m.content })),
-    temperature: req.temperature ?? 0.3,
-    max_tokens: req.maxTokens ?? 4096,
+    temperature: isReasoningModel(req.model) ? undefined : (req.temperature ?? 0.3),
+    ...buildTokensParam(req.model, req.maxTokens),
     stream: false,
   };
 
@@ -154,69 +169,130 @@ async function openaiComplete(req: CompletionRequest): Promise<LLMResponse> {
  */
 let copilotTokenCache: { token: string; expiresAt: number } | null = null;
 
-async function getCopilotSessionToken(githubPAT: string): Promise<string> {
+/**
+ * Tracks whether the internal token exchange has already failed for
+ * this session, so we skip straight to the GitHub Models fallback.
+ */
+let copilotTokenExchangeBlocked = false;
+
+async function getCopilotSessionToken(githubPAT: string): Promise<string | null> {
+  if (copilotTokenExchangeBlocked) return null;
+
   // Return cached token if still valid (with 60s buffer)
   if (copilotTokenCache && copilotTokenCache.expiresAt > Date.now() / 1000 + 60) {
     return copilotTokenCache.token;
   }
 
-  const res = await fetch('/api/proxy/github-api/copilot_internal/v2/token', {
-    method: 'GET',
-    headers: {
-      Authorization: `token ${githubPAT}`,
-      Accept: 'application/json',
-    },
-  });
+  try {
+    const res = await fetch('/api/proxy/github-api/copilot_internal/v2/token', {
+      method: 'GET',
+      headers: {
+        Authorization: `token ${githubPAT}`,
+        Accept: 'application/json',
+      },
+    });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    if (res.status === 401 || res.status === 403) {
-      throw new Error(
-        `GitHub Copilot: токен не имеет доступа к Copilot. ` +
-        `Убедитесь, что PAT имеет scope "copilot" и подписка Copilot активна. (${res.status}) ${text}`,
-      );
+    if (res.ok) {
+      const data = (await res.json()) as { token: string; expires_at: number };
+      copilotTokenCache = { token: data.token, expiresAt: data.expires_at };
+      return data.token;
     }
-    throw new Error(`GitHub Copilot: ошибка получения сессионного токена (${res.status}): ${text}`);
-  }
 
-  const data = (await res.json()) as { token: string; expires_at: number };
-  copilotTokenCache = { token: data.token, expiresAt: data.expires_at };
-  return data.token;
+    // 404 means no Copilot subscription or wrong token type — mark blocked
+    // so subsequent calls go straight to GitHub Models fallback.
+    if (res.status === 404 || res.status === 422) {
+      copilotTokenExchangeBlocked = true;
+      return null;
+    }
+
+    if (res.status === 401 || res.status === 403) {
+      // Token is invalid for Copilot but may still work with GitHub Models
+      copilotTokenExchangeBlocked = true;
+      return null;
+    }
+
+    copilotTokenExchangeBlocked = true;
+    return null;
+  } catch {
+    // Network error — fall through to GitHub Models
+    copilotTokenExchangeBlocked = true;
+    return null;
+  }
 }
 
 async function githubCopilotComplete(req: CompletionRequest): Promise<LLMResponse> {
   const githubPAT = req.provider.apiKey;
   if (!githubPAT) throw new Error('GitHub Copilot: GitHub PAT не указан');
 
-  // Exchange PAT for Copilot session token
+  // Try the internal Copilot token exchange first
   const sessionToken = await getCopilotSessionToken(githubPAT);
 
-  const body = {
+  const body: Record<string, unknown> = {
     model: req.model,
     messages: buildMessages(req.systemPrompt, req.messages).map((m) => ({ role: m.role, content: m.content })),
-    temperature: req.temperature ?? 0.3,
-    max_tokens: req.maxTokens ?? 4096,
+    temperature: isReasoningModel(req.model) ? undefined : (req.temperature ?? 0.3),
+    ...buildTokensParam(req.model, req.maxTokens),
     stream: false,
   };
 
-  const data = (await post('/api/proxy/github-copilot/chat/completions', body, {
-    Authorization: `Bearer ${sessionToken}`,
-    'Editor-Version': 'copilot-fleet/0.1.0',
-    'Openai-Intent': 'conversation-panel',
-    'Copilot-Integration-Id': 'copilot-fleet',
-  }, req.signal)) as OpenAIChatResponse;
+  // Path A: Classic Copilot API (requires Copilot subscription + copilot scope)
+  if (sessionToken) {
+    const data = (await post('/api/proxy/github-copilot/chat/completions', body, {
+      Authorization: `Bearer ${sessionToken}`,
+      'Editor-Version': 'vscode/1.96.0',
+      'Editor-Plugin-Version': 'copilot-fleet/0.1.0',
+      'Openai-Intent': 'conversation-panel',
+      'Copilot-Integration-Id': 'vscode-chat',
+    }, req.signal)) as OpenAIChatResponse;
 
-  const choice = data.choices?.[0];
-  return {
-    content: choice?.message?.content ?? '',
-    model: data.model ?? req.model,
-    usage: {
-      promptTokens: data.usage?.prompt_tokens ?? 0,
-      completionTokens: data.usage?.completion_tokens ?? 0,
-      totalTokens: data.usage?.total_tokens ?? 0,
-    },
-    finishReason: mapOpenAIFinishReason(choice?.finish_reason),
-  };
+    const choice = data.choices?.[0];
+    return {
+      content: choice?.message?.content ?? '',
+      model: data.model ?? req.model,
+      usage: {
+        promptTokens: data.usage?.prompt_tokens ?? 0,
+        completionTokens: data.usage?.completion_tokens ?? 0,
+        totalTokens: data.usage?.total_tokens ?? 0,
+      },
+      finishReason: mapOpenAIFinishReason(choice?.finish_reason),
+    };
+  }
+
+  // Path B: GitHub Models API (works with any GitHub PAT that has models access)
+  // GitHub Models uses different model identifiers than Copilot
+  const mappedModel = mapToGitHubModelsName(req.model);
+  body.model = mappedModel;
+  // Reasoning models need max_completion_tokens instead of max_tokens
+  if (isReasoningModel(mappedModel)) {
+    body.max_completion_tokens = body.max_tokens ?? body.max_completion_tokens;
+    delete body.max_tokens;
+    delete body.temperature;
+  }
+  try {
+    const data = (await post('/api/proxy/github-models/chat/completions', body, {
+      Authorization: `Bearer ${githubPAT}`,
+    }, req.signal)) as OpenAIChatResponse;
+
+    const choice = data.choices?.[0];
+    return {
+      content: choice?.message?.content ?? '',
+      model: data.model ?? req.model,
+      usage: {
+        promptTokens: data.usage?.prompt_tokens ?? 0,
+        completionTokens: data.usage?.completion_tokens ?? 0,
+        totalTokens: data.usage?.total_tokens ?? 0,
+      },
+      finishReason: mapOpenAIFinishReason(choice?.finish_reason),
+    };
+  } catch (modelsError) {
+    throw new Error(
+      `GitHub Copilot: не удалось подключиться.\n` +
+      `• Copilot API: подписка не найдена или PAT без scope "copilot".\n` +
+      `• GitHub Models: ${modelsError instanceof Error ? modelsError.message : String(modelsError)}\n` +
+      `Убедитесь, что у вас есть подписка Copilot или доступ к GitHub Models, ` +
+      `и PAT создан как Classic Token с нужными scopes.`,
+    );
+  }
 }
 
 /* ── Anthropic ────────────────────────────────────────── */
@@ -373,6 +449,30 @@ interface OllamaResponse {
   done_reason?: string;
   prompt_eval_count?: number;
   eval_count?: number;
+}
+
+/** Map Copilot model names to GitHub Models compatible identifiers. */
+function mapToGitHubModelsName(model: string): string {
+  const MAP: Record<string, string> = {
+    'claude-sonnet-4': 'gpt-4o',
+    'claude-3-7-sonnet': 'gpt-4o',
+    'claude-3-5-haiku': 'gpt-4o-mini',
+  };
+  return MAP[model] ?? model;
+}
+
+/** Reasoning models (o1, o3, etc.) use max_completion_tokens instead of max_tokens. */
+function isReasoningModel(model: string): boolean {
+  return /^o[0-9]/.test(model);
+}
+
+/** Build the tokens parameter appropriate for the model. */
+function buildTokensParam(model: string, maxTokens: number | undefined): Record<string, unknown> {
+  const limit = maxTokens ?? 4096;
+  if (isReasoningModel(model)) {
+    return { max_completion_tokens: limit };
+  }
+  return { max_tokens: limit };
 }
 
 function mapOpenAIFinishReason(reason?: string): LLMResponse['finishReason'] {

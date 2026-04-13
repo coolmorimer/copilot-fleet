@@ -1,0 +1,103 @@
+{
+  "id": "quick-fix",
+  "name": "Quick Fix",
+  "description": "Single-agent graph for small fixes and targeted code changes.",
+  "nodes": [
+    {
+      "id": "trigger",
+      "type": "trigger",
+      "label": "Trigger",
+      "description": "Starts the quick-fix workflow.",
+      "position": {
+        "x": 100,
+        "y": 200
+      },
+      "ports": [
+        {
+          "id": "out",
+          "name": "Output",
+          "type": "output",
+          "dataType": "task"
+        }
+      ],
+      "config": {},
+      "status": "idle"
+    },
+    {
+      "id": "coder",
+      "type": "agent",
+      "label": "Coder",
+      "description": "Implements the requested fix.",
+      "position": {
+        "x": 400,
+        "y": 200
+      },
+      "ports": [
+        {
+          "id": "in",
+          "name": "Input",
+          "type": "input",
+          "dataType": "task"
+        },
+        {
+          "id": "out",
+          "name": "Output",
+          "type": "output",
+          "dataType": "patch"
+        }
+      ],
+      "config": {
+        "agentId": "builtin-coder",
+        "provider": "github-copilot",
+        "model": "claude-sonnet-4"
+      },
+      "status": "idle"
+    },
+    {
+      "id": "output",
+      "type": "output",
+      "label": "Output",
+      "description": "Collects the final quick-fix result.",
+      "position": {
+        "x": 700,
+        "y": 200
+      },
+      "ports": [
+        {
+          "id": "in",
+          "name": "Input",
+          "type": "input",
+          "dataType": "patch"
+        }
+      ],
+      "config": {},
+      "status": "idle"
+    }
+  ],
+  "edges": [
+    {
+      "id": "trigger-to-coder",
+      "source": "trigger",
+      "sourcePort": "out",
+      "target": "coder",
+      "targetPort": "in"
+    },
+    {
+      "id": "coder-to-output",
+      "source": "coder",
+      "sourcePort": "out",
+      "target": "output",
+      "targetPort": "in"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "createdAt": "2026-04-09T00:00:00Z",
+    "updatedAt": "2026-04-09T00:00:00Z",
+    "author": "CopilotFleet",
+    "tags": [
+      "quick",
+      "single-agent"
+    ]
+  }
+}

@@ -39,7 +39,11 @@ function AgentNodeComponent({ data, selected }: FleetFlowNodeProps) {
   const agentId = readString(data.config, ['agentId'], '');
   const provider = readString(data.config, ['provider', 'providerType'], 'Auto');
   const model = readString(data.config, ['model', 'modelName'], t('nodeCard.modelNotSet'));
-  const prompt = readString(data.config, ['prompt', 'systemPrompt', 'instruction'], t('nodeCard.promptNotSet'));
+  const prompt = readString(
+    data.config,
+    ['prompt', 'systemPrompt', 'instruction'],
+    `You are ${data.label}. Execute your role thoroughly and provide concrete output.`,
+  );
   const files = readStringList(data.config, ['files', 'fileGlobs', 'paths']);
   const temperature = readNumber(data.config, ['temperature'], 0.3);
   const maxTokens = readNumber(data.config, ['maxTokens'], 4096);
@@ -47,6 +51,9 @@ function AgentNodeComponent({ data, selected }: FleetFlowNodeProps) {
   const prNumber = readNumber(data.config, ['prNumber'], 0);
   const issueUrl = readString(data.config, ['issueUrl'], '');
   const prUrl = readString(data.config, ['prUrl'], '');
+  const lastOutput = readString(data.config, ['lastOutputSummary', 'lastOutput'], '');
+  const lastModel = readString(data.config, ['lastModel'], '');
+  const lastTokens = readNumber(data.config, ['lastTokens'], 0);
   const agentIcon = AGENT_ICON_MAP[agentId] ?? <Bot size={14} />;
 
   return (
@@ -71,6 +78,15 @@ function AgentNodeComponent({ data, selected }: FleetFlowNodeProps) {
         <InlineMeter label={t('nodeCard.temperature')} value={Math.round(temperature * 50)} max={100} accent={color.glow} />
         <InlineMeter label={t('nodeCard.maxTokens')} value={Math.min(maxTokens, 8192)} max={8192} accent={color.header} />
       </div>
+      {lastOutput ? (
+        <Field label={t('nodeCard.summary')} value={<p className="leading-5 text-fleet-text/90">{previewValue(lastOutput, 180)}</p>} />
+      ) : null}
+      {lastModel ? (
+        <div className="grid grid-cols-2 gap-2">
+          <Field label={t('nodeCard.model')} value={<span className="font-mono text-[10px]">{previewValue(lastModel, 24)}</span>} />
+          <Field label={t('nodeCard.tokens')} value={lastTokens > 0 ? String(lastTokens) : '—'} />
+        </div>
+      ) : null}
       {issueNumber > 0 || prNumber > 0 ? (
         <div className="grid grid-cols-2 gap-2">
           <Field

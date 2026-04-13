@@ -39,11 +39,14 @@ export class OpenAIProvider extends BaseProvider {
   async complete(request: LLMRequest): Promise<LLMResponse> {
     this.ensureInitialized();
 
-    const body = {
+    const reasoning = /^o[0-9]/.test(request.model);
+    const body: Record<string, unknown> = {
       model: request.model,
       messages: this.buildMessages(request),
-      temperature: request.temperature,
-      max_tokens: request.maxTokens,
+      temperature: reasoning ? undefined : request.temperature,
+      ...(reasoning
+        ? { max_completion_tokens: request.maxTokens }
+        : { max_tokens: request.maxTokens }),
       tools: this.toOpenAITools(request.tools),
       stream: false,
     };

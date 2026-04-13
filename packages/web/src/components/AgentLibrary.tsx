@@ -31,12 +31,39 @@ export function AgentLibrary({ filter, searchQuery = '' }: AgentLibraryProps): R
   const t = useT();
   const addNode = useGraphStore((state) => state.addNode);
   const updateNodeData = useGraphStore((state) => state.updateNodeData);
+  const nodes = useGraphStore((state) => state.nodes);
   const query = searchQuery.trim().toLowerCase();
 
   const tName = (id: string): string => t(`agent.${id}` as TKey);
   const tDesc = (id: string): string => t(`agent.${id}Desc` as TKey);
 
-  const agents = AGENT_LIBRARY.filter((agent) => (filter === 'builtin' ? agent.builtin : !agent.builtin)).filter((agent) => {
+  const dynamicCustomAgents = nodes
+    .filter((node) => node.data.nodeType === 'agent')
+    .map((node) => {
+      const cfg = node.data.config ?? {};
+      const rawAgentId = typeof cfg.agentId === 'string' ? cfg.agentId : node.id;
+      const baseId = rawAgentId.replace(/^builtin-/, '');
+      const icon = (Object.prototype.hasOwnProperty.call(ICON_MAP, baseId) ? baseId : 'bot') as AgentIconId;
+      return {
+        id: `custom-${node.id}`,
+        name: node.data.label,
+        description: node.data.description ?? 'Generated from current workflow graph.',
+        systemPrompt: typeof cfg.systemPrompt === 'string' ? cfg.systemPrompt : `You are ${node.data.label}.`,
+        skills: [],
+        icon,
+        color: '#60a5fa',
+        provider: (typeof cfg.provider === 'string' ? cfg.provider : 'github-copilot') as (typeof AGENT_LIBRARY)[number]['provider'],
+        model: typeof cfg.model === 'string' ? cfg.model : 'gpt-4o',
+        builtin: false,
+      };
+    })
+    .filter((agent, index, all) => all.findIndex((a) => a.name === agent.name && a.model === agent.model) === index);
+
+  const source = filter === 'builtin'
+    ? AGENT_LIBRARY.filter((agent) => agent.builtin)
+    : [...dynamicCustomAgents, ...AGENT_LIBRARY.filter((agent) => !agent.builtin)];
+
+  const agents = source.filter((agent) => {
     if (!query) {
       return true;
     }

@@ -13,6 +13,7 @@
   "references": [
     { "path": "../shared" },
     { "path": "../core" },
+    { "path": "../providers" },
     { "path": "../agents" }
   ]
 }

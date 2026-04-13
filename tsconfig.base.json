@@ -5,9 +5,10 @@
     "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
-      "@copilot-fleet/shared": ["packages/shared/dist/index.d.ts"],
-      "@copilot-fleet/core": ["packages/core/dist/index.d.ts"],
-      "@copilot-fleet/providers": ["packages/providers/dist/index.d.ts"]
+      "@copilot-fleet/shared": ["packages/shared/src/index.ts"],
+      "@copilot-fleet/core": ["packages/core/src/index.ts"],
+      "@copilot-fleet/providers": ["packages/providers/src/index.ts"],
+      "@copilot-fleet/agents": ["packages/agents/src/index.ts"]
     },
     "lib": ["ES2022", "DOM"],
     "strict": true,

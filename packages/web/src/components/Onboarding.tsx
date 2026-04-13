@@ -33,6 +33,7 @@ export function Onboarding(): ReactElement {
   const loadGraph = useGraphStore((state) => state.loadGraph);
 
   const finishOnboarding = (): void => {
+    let templateProviders: ProviderConfig[] | undefined;
     if (provider !== 'skip') {
       const config: ProviderConfig = {
         type: provider,
@@ -41,9 +42,10 @@ export function Onboarding(): ReactElement {
         defaultModel: provider === 'ollama' ? 'qwen2.5-coder' : provider === 'openai' ? 'gpt-4.1' : 'claude-sonnet-4',
       };
       addProvider(config);
+      templateProviders = [config];
     }
 
-    loadGraph(createStarterTemplate(template));
+    loadGraph(createStarterTemplate(template, { providers: templateProviders }));
     completeOnboarding();
   };
 

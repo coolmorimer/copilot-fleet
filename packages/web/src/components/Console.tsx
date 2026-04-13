@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
-import { AlertCircle, CheckCircle2, Info, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Download, ExternalLink, Info, Monitor, XCircle } from 'lucide-react';
 
 import { useSessionStore } from '../store/session-store.js';
+import { useSettingsStore } from '../store/settings-store.js';
 import { useT } from '../i18n/useT.js';
+import { publishRunToRepo } from '../engine/repo-publisher.js';
 
 interface ConsoleProps {
   height: number;
@@ -32,9 +34,13 @@ export function Console({ height, onResize }: ConsoleProps): ReactElement {
   const t = useT();
   const logs = useSessionStore((state) => state.logs);
   const errors = useSessionStore((state) => state.errors);
+  const results = useSessionStore((state) => state.results);
   const clearConsole = useSessionStore((state) => state.clearConsole);
+  const providers = useSettingsStore((state) => state.providers);
   const [isDragging, setIsDragging] = useState(false);
   const [filter, setFilter] = useState<ConsoleFilter>('all');
+  const [publishing, setPublishing] = useState(false);
+  const [publishInfo, setPublishInfo] = useState<string>('');
   const startY = useRef(0);
   const startHeight = useRef(height);
   const logRef = useRef<HTMLDivElement | null>(null);
@@ -89,6 +95,76 @@ export function Console({ height, onResize }: ConsoleProps): ReactElement {
     logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [renderedLogs.length]);
 
+  const resultEntries = Array.from(results.entries()).map(([nodeId, value]) => ({ ...value, nodeId }));
+
+  const latestSessionInput = [...logs].reverse().find((event) => {
+    if (event.type !== 'log') return false;
+    return event.data.message === 'Session input prepared';
+  });
+
+  const repository = typeof latestSessionInput?.data.repository === 'string' ? latestSessionInput.data.repository : '';
+
+  const openInVSCode = (): void => {
+    if (!repository) return;
+    window.open(`vscode://vscode.git/clone?url=${encodeURIComponent(`https://github.com/${repository}.git`)}`, '_self');
+  };
+
+  const downloadZip = (): void => {
+    if (!repository) return;
+    window.open(`https://github.com/${repository}/archive/refs/heads/main.zip`, '_blank');
+  };
+
+  const openCodespaces = (): void => {
+    if (!repository) return;
+    const [owner, repo] = repository.split('/');
+    window.open(`https://github.com/codespaces/new?repo=${encodeURIComponent(`${owner}/${repo}`)}&ref=main`, '_blank');
+  };
+
+  const publishToRepo = async (): Promise<void> => {
+    const taskPrompt = typeof latestSessionInput?.data.prompt === 'string' ? latestSessionInput.data.prompt : '';
+    const token = providers.find((p) => p.type === 'github-copilot')?.apiKey;
+
+    if (!repository || repository === '(not specified)') {
+      setPublishInfo('Не указан repository в запуске.');
+      return;
+    }
+    if (!token) {
+      setPublishInfo('Нет GitHub токена в настройках провайдера github-copilot.');
+      return;
+    }
+    if (results.size === 0) {
+      setPublishInfo('Нет результатов для публикации.');
+      return;
+    }
+
+    setPublishing(true);
+    setPublishInfo('');
+    try {
+      const result = await publishRunToRepo(
+        results,
+        repository,
+        'main',
+        taskPrompt,
+        token,
+        (msg) => setPublishInfo(msg),
+      );
+
+      if (result.ok) {
+        setPublishInfo(
+          result.commitUrl
+            ? `✅ ${result.filesCount} файлов закоммичено: ${result.commitUrl}`
+            : `✅ ${result.filesCount} файлов закоммичено в ${repository}`,
+        );
+      } else {
+        setPublishInfo(`❌ ${result.error ?? 'Неизвестная ошибка'}`);
+      }
+    } catch (err) {
+      setPublishInfo(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   return (
     <section className="border-t border-fleet-border bg-fleet-surface" style={{ height: `${height}px` }}>
       <div
@@ -105,6 +181,42 @@ export function Console({ height, onResize }: ConsoleProps): ReactElement {
         <div className="flex items-center justify-between gap-3 border-b border-fleet-border px-4 py-2 text-xs uppercase tracking-[0.2em] text-fleet-muted">
           <span>{t('console.title')}</span>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void publishToRepo()}
+              disabled={publishing}
+              className="min-h-9 rounded-lg border border-fleet-border bg-fleet-panel px-3 text-[11px] text-fleet-text transition hover:border-fleet-accent disabled:opacity-60"
+            >
+              {publishing ? 'Публикация…' : 'В репозиторий'}
+            </button>
+            {repository && repository !== '(not specified)' ? (
+              <>
+                <button
+                  type="button"
+                  onClick={openInVSCode}
+                  title="Открыть в VS Code"
+                  className="flex min-h-9 items-center gap-1.5 rounded-lg border border-fleet-border bg-fleet-panel px-3 text-[11px] text-fleet-text transition hover:border-fleet-accent"
+                >
+                  <Monitor size={13} /> VS Code
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadZip}
+                  title="Скачать архивом"
+                  className="flex min-h-9 items-center gap-1.5 rounded-lg border border-fleet-border bg-fleet-panel px-3 text-[11px] text-fleet-text transition hover:border-fleet-accent"
+                >
+                  <Download size={13} /> ZIP
+                </button>
+                <button
+                  type="button"
+                  onClick={openCodespaces}
+                  title="Открыть в GitHub Codespaces"
+                  className="flex min-h-9 items-center gap-1.5 rounded-lg border border-fleet-border bg-fleet-panel px-3 text-[11px] text-fleet-text transition hover:border-fleet-accent"
+                >
+                  <ExternalLink size={13} /> Codespaces
+                </button>
+              </>
+            ) : null}
             <select value={filter} onChange={(event) => setFilter(event.target.value as ConsoleFilter)} className="min-h-9 rounded-lg border border-fleet-border bg-fleet-panel px-2 text-[11px] text-fleet-text outline-none">
               {FILTERS.map((option) => (
                 <option key={option} value={option}>
@@ -118,6 +230,24 @@ export function Console({ height, onResize }: ConsoleProps): ReactElement {
           </div>
         </div>
         <div ref={logRef} className="flex-1 overflow-y-auto px-4 py-3 font-mono text-xs text-fleet-text">
+          {publishInfo ? (
+            <div className="mb-3 rounded-lg border border-fleet-border bg-fleet-bg/40 p-3 text-fleet-muted">{publishInfo}</div>
+          ) : null}
+
+          {resultEntries.length > 0 ? (
+            <div className="mb-3 rounded-lg border border-fleet-border bg-fleet-bg/30 p-3">
+              <div className="mb-2 text-[11px] uppercase tracking-[0.16em] text-fleet-muted">Промежуточные результаты</div>
+              <div className="space-y-2">
+                {resultEntries.map((result) => (
+                  <details key={`result-${result.nodeId}`} className="rounded-md border border-fleet-border bg-fleet-panel/50 px-2 py-1">
+                    <summary className="cursor-pointer text-fleet-text">{result.nodeId} · {result.status}</summary>
+                    <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words text-fleet-muted">{typeof result.output === 'string' ? result.output : JSON.stringify(result.output ?? '', null, 2)}</pre>
+                  </details>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {renderedLogs.length === 0 ? (
             <div className="text-fleet-muted">{t('console.emptyHint')}</div>
           ) : (
