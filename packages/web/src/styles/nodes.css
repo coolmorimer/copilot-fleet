@@ -1,0 +1,125 @@
+/* Base node style */
+.fleet-node {
+  @apply rounded-xl border border-fleet-border bg-fleet-surface shadow-lg;
+  min-width: 240px;
+  transition: box-shadow 0.3s ease, transform 0.2s ease;
+}
+
+.fleet-node:hover {
+  transform: translateY(-1px);
+}
+
+.fleet-node.selected {
+  @apply ring-2 ring-fleet-accent;
+}
+
+/* Node header */
+.fleet-node-header {
+  @apply flex items-center justify-between px-3 py-2 rounded-t-xl text-sm font-semibold text-white;
+}
+
+/* Node body */
+.fleet-node-body {
+  @apply px-3 py-2 text-xs space-y-1.5;
+}
+
+/* Status indicators */
+.fleet-node.status-idle {
+  opacity: 0.85;
+}
+
+.fleet-node.status-queued {
+  @apply border-yellow-500/50;
+}
+
+.fleet-node.status-running {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.fleet-node.status-done {
+  @apply border-green-500;
+}
+
+.fleet-node.status-error {
+  @apply border-red-500;
+}
+
+/* Glow effects per node type */
+.fleet-node.type-trigger.status-running {
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+}
+
+.fleet-node.type-agent.status-running {
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+}
+
+.fleet-node.type-llm.status-running {
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+}
+
+.fleet-node.type-splitter.status-running {
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
+}
+
+.fleet-node.type-merger.status-running {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+}
+
+.fleet-node.type-condition.status-running {
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+}
+
+.fleet-node.type-human.status-running {
+  box-shadow: 0 0 20px rgba(236, 72, 153, 0.4);
+}
+
+.fleet-node.type-tool.status-running {
+  box-shadow: 0 0 20px rgba(20, 184, 166, 0.4);
+}
+
+.fleet-node.type-output.status-running {
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+}
+
+/* Port styles */
+.fleet-port {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #2a2a4a;
+  background: #1a1a2e;
+  transition: all 0.2s;
+}
+
+.fleet-port:hover {
+  transform: scale(1.3);
+  border-color: #6366f1;
+  background: #6366f1;
+}
+
+.fleet-port.connected {
+  background: #6366f1;
+  border-color: #818cf8;
+}
+
+/* Progress bar */
+.fleet-progress {
+  @apply h-1.5 rounded-full bg-fleet-border overflow-hidden;
+}
+
+.fleet-progress-bar {
+  @apply h-full rounded-full transition-all duration-300;
+  background: linear-gradient(90deg, #6366f1, #818cf8);
+}
+
+/* Pulse animation for running glow */
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.7;
+  }
+}

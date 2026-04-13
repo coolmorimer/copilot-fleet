@@ -1,0 +1,216 @@
+{
+  "id": "refactor-platoon",
+  "name": "Refactor Platoon",
+  "description": "Refactoring-focused pipeline that balances structural changes with security and test validation.",
+  "nodes": [
+    {
+      "id": "trigger",
+      "type": "trigger",
+      "label": "Trigger",
+      "description": "Starts the refactoring workflow.",
+      "position": { "x": 100, "y": 300 },
+      "ports": [
+        { "id": "out", "name": "Output", "type": "output", "dataType": "task" }
+      ],
+      "config": {},
+      "status": "idle"
+    },
+    {
+      "id": "researcher",
+      "type": "agent",
+      "label": "Researcher",
+      "description": "Maps the existing system before structural change.",
+      "position": { "x": 350, "y": 300 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "task" },
+        { "id": "out", "name": "Output", "type": "output", "dataType": "analysis" }
+      ],
+      "config": {
+        "agentId": "builtin-researcher",
+        "provider": "github-copilot",
+        "model": "claude-sonnet-4"
+      },
+      "status": "idle"
+    },
+    {
+      "id": "splitter",
+      "type": "splitter",
+      "label": "Splitter",
+      "description": "Splits refactoring work into implementation and security tracks.",
+      "position": { "x": 600, "y": 300 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "analysis" },
+        { "id": "out-refactorer", "name": "Refactorer", "type": "output", "dataType": "workstream" },
+        { "id": "out-security", "name": "Security", "type": "output", "dataType": "workstream" }
+      ],
+      "config": {},
+      "status": "idle"
+    },
+    {
+      "id": "refactorer",
+      "type": "agent",
+      "label": "Refactorer",
+      "description": "Executes the structural code improvements.",
+      "position": { "x": 900, "y": 180 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "workstream" },
+        { "id": "out", "name": "Output", "type": "output", "dataType": "refactor" }
+      ],
+      "config": {
+        "agentId": "builtin-refactorer",
+        "provider": "github-copilot",
+        "model": "claude-sonnet-4"
+      },
+      "status": "idle"
+    },
+    {
+      "id": "security",
+      "type": "agent",
+      "label": "Security",
+      "description": "Checks the refactor for newly introduced risks.",
+      "position": { "x": 900, "y": 420 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "workstream" },
+        { "id": "out", "name": "Output", "type": "output", "dataType": "security-review" }
+      ],
+      "config": {
+        "agentId": "builtin-security",
+        "provider": "github-copilot",
+        "model": "claude-sonnet-4"
+      },
+      "status": "idle"
+    },
+    {
+      "id": "merger",
+      "type": "merger",
+      "label": "Merger",
+      "description": "Combines structural and security outputs.",
+      "position": { "x": 1200, "y": 300 },
+      "ports": [
+        { "id": "in-refactorer", "name": "Refactorer", "type": "input", "dataType": "refactor" },
+        { "id": "in-security", "name": "Security", "type": "input", "dataType": "security-review" },
+        { "id": "out", "name": "Output", "type": "output", "dataType": "bundle" }
+      ],
+      "config": {},
+      "status": "idle"
+    },
+    {
+      "id": "tester",
+      "type": "agent",
+      "label": "Tester",
+      "description": "Validates behavior after the refactor.",
+      "position": { "x": 1450, "y": 300 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "bundle" },
+        { "id": "out", "name": "Output", "type": "output", "dataType": "validation" }
+      ],
+      "config": {
+        "agentId": "builtin-tester",
+        "provider": "github-copilot",
+        "model": "claude-sonnet-4"
+      },
+      "status": "idle"
+    },
+    {
+      "id": "reviewer",
+      "type": "agent",
+      "label": "Reviewer",
+      "description": "Reviews the refactor after security and test validation.",
+      "position": { "x": 1700, "y": 300 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "validation" },
+        { "id": "out", "name": "Output", "type": "output", "dataType": "review" }
+      ],
+      "config": {
+        "agentId": "builtin-reviewer",
+        "provider": "github-copilot",
+        "model": "claude-sonnet-4"
+      },
+      "status": "idle"
+    },
+    {
+      "id": "output",
+      "type": "output",
+      "label": "Output",
+      "description": "Collects the final refactoring package.",
+      "position": { "x": 1950, "y": 300 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "review" }
+      ],
+      "config": {},
+      "status": "idle"
+    }
+  ],
+  "edges": [
+    {
+      "id": "trigger-to-researcher",
+      "source": "trigger",
+      "sourcePort": "out",
+      "target": "researcher",
+      "targetPort": "in"
+    },
+    {
+      "id": "researcher-to-splitter",
+      "source": "researcher",
+      "sourcePort": "out",
+      "target": "splitter",
+      "targetPort": "in"
+    },
+    {
+      "id": "splitter-to-refactorer",
+      "source": "splitter",
+      "sourcePort": "out-refactorer",
+      "target": "refactorer",
+      "targetPort": "in"
+    },
+    {
+      "id": "splitter-to-security",
+      "source": "splitter",
+      "sourcePort": "out-security",
+      "target": "security",
+      "targetPort": "in"
+    },
+    {
+      "id": "refactorer-to-merger",
+      "source": "refactorer",
+      "sourcePort": "out",
+      "target": "merger",
+      "targetPort": "in-refactorer"
+    },
+    {
+      "id": "security-to-merger",
+      "source": "security",
+      "sourcePort": "out",
+      "target": "merger",
+      "targetPort": "in-security"
+    },
+    {
+      "id": "merger-to-tester",
+      "source": "merger",
+      "sourcePort": "out",
+      "target": "tester",
+      "targetPort": "in"
+    },
+    {
+      "id": "tester-to-reviewer",
+      "source": "tester",
+      "sourcePort": "out",
+      "target": "reviewer",
+      "targetPort": "in"
+    },
+    {
+      "id": "reviewer-to-output",
+      "source": "reviewer",
+      "sourcePort": "out",
+      "target": "output",
+      "targetPort": "in"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "createdAt": "2026-04-09T00:00:00Z",
+    "updatedAt": "2026-04-09T00:00:00Z",
+    "author": "CopilotFleet",
+    "tags": ["refactoring", "security", "5-agents"]
+  }
+}

@@ -1,0 +1,225 @@
+{
+  "id": "fullstack-team",
+  "name": "Fullstack Team",
+  "description": "Parallel delivery workflow that coordinates implementation, testing, and design before final review.",
+  "nodes": [
+    {
+      "id": "trigger",
+      "type": "trigger",
+      "label": "Trigger",
+      "description": "Starts the fullstack team workflow.",
+      "position": { "x": 100, "y": 300 },
+      "ports": [
+        { "id": "out", "name": "Output", "type": "output", "dataType": "task" }
+      ],
+      "config": {},
+      "status": "idle"
+    },
+    {
+      "id": "planner",
+      "type": "agent",
+      "label": "Planner",
+      "description": "Creates the execution plan for the team.",
+      "position": { "x": 350, "y": 300 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "task" },
+        { "id": "out", "name": "Output", "type": "output", "dataType": "plan" }
+      ],
+      "config": {
+        "agentId": "builtin-planner",
+        "provider": "github-copilot",
+        "model": "claude-sonnet-4"
+      },
+      "status": "idle"
+    },
+    {
+      "id": "splitter",
+      "type": "splitter",
+      "label": "Splitter",
+      "description": "Fans the plan out into parallel workstreams.",
+      "position": { "x": 600, "y": 300 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "plan" },
+        { "id": "out-coder", "name": "Coder", "type": "output", "dataType": "workstream" },
+        { "id": "out-tester", "name": "Tester", "type": "output", "dataType": "workstream" },
+        { "id": "out-designer", "name": "Designer", "type": "output", "dataType": "workstream" }
+      ],
+      "config": {},
+      "status": "idle"
+    },
+    {
+      "id": "coder",
+      "type": "agent",
+      "label": "Coder",
+      "description": "Implements the product changes.",
+      "position": { "x": 900, "y": 100 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "workstream" },
+        { "id": "out", "name": "Output", "type": "output", "dataType": "implementation" }
+      ],
+      "config": {
+        "agentId": "builtin-coder",
+        "provider": "github-copilot",
+        "model": "claude-sonnet-4"
+      },
+      "status": "idle"
+    },
+    {
+      "id": "tester",
+      "type": "agent",
+      "label": "Tester",
+      "description": "Builds and validates the test coverage.",
+      "position": { "x": 900, "y": 300 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "workstream" },
+        { "id": "out", "name": "Output", "type": "output", "dataType": "validation" }
+      ],
+      "config": {
+        "agentId": "builtin-tester",
+        "provider": "github-copilot",
+        "model": "claude-sonnet-4"
+      },
+      "status": "idle"
+    },
+    {
+      "id": "designer",
+      "type": "agent",
+      "label": "Designer",
+      "description": "Refines the UX and interface decisions.",
+      "position": { "x": 900, "y": 500 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "workstream" },
+        { "id": "out", "name": "Output", "type": "output", "dataType": "design" }
+      ],
+      "config": {
+        "agentId": "builtin-designer",
+        "provider": "github-copilot",
+        "model": "claude-sonnet-4"
+      },
+      "status": "idle"
+    },
+    {
+      "id": "merger",
+      "type": "merger",
+      "label": "Merger",
+      "description": "Combines parallel workstreams into a single package.",
+      "position": { "x": 1200, "y": 300 },
+      "ports": [
+        { "id": "in-coder", "name": "Coder", "type": "input", "dataType": "implementation" },
+        { "id": "in-tester", "name": "Tester", "type": "input", "dataType": "validation" },
+        { "id": "in-designer", "name": "Designer", "type": "input", "dataType": "design" },
+        { "id": "out", "name": "Output", "type": "output", "dataType": "bundle" }
+      ],
+      "config": {},
+      "status": "idle"
+    },
+    {
+      "id": "reviewer",
+      "type": "agent",
+      "label": "Reviewer",
+      "description": "Performs final quality review on the combined output.",
+      "position": { "x": 1450, "y": 300 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "bundle" },
+        { "id": "out", "name": "Output", "type": "output", "dataType": "review" }
+      ],
+      "config": {
+        "agentId": "builtin-reviewer",
+        "provider": "github-copilot",
+        "model": "claude-sonnet-4"
+      },
+      "status": "idle"
+    },
+    {
+      "id": "output",
+      "type": "output",
+      "label": "Output",
+      "description": "Collects the reviewed fullstack result.",
+      "position": { "x": 1700, "y": 300 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "review" }
+      ],
+      "config": {},
+      "status": "idle"
+    }
+  ],
+  "edges": [
+    {
+      "id": "trigger-to-planner",
+      "source": "trigger",
+      "sourcePort": "out",
+      "target": "planner",
+      "targetPort": "in"
+    },
+    {
+      "id": "planner-to-splitter",
+      "source": "planner",
+      "sourcePort": "out",
+      "target": "splitter",
+      "targetPort": "in"
+    },
+    {
+      "id": "splitter-to-coder",
+      "source": "splitter",
+      "sourcePort": "out-coder",
+      "target": "coder",
+      "targetPort": "in"
+    },
+    {
+      "id": "splitter-to-tester",
+      "source": "splitter",
+      "sourcePort": "out-tester",
+      "target": "tester",
+      "targetPort": "in"
+    },
+    {
+      "id": "splitter-to-designer",
+      "source": "splitter",
+      "sourcePort": "out-designer",
+      "target": "designer",
+      "targetPort": "in"
+    },
+    {
+      "id": "coder-to-merger",
+      "source": "coder",
+      "sourcePort": "out",
+      "target": "merger",
+      "targetPort": "in-coder"
+    },
+    {
+      "id": "tester-to-merger",
+      "source": "tester",
+      "sourcePort": "out",
+      "target": "merger",
+      "targetPort": "in-tester"
+    },
+    {
+      "id": "designer-to-merger",
+      "source": "designer",
+      "sourcePort": "out",
+      "target": "merger",
+      "targetPort": "in-designer"
+    },
+    {
+      "id": "merger-to-reviewer",
+      "source": "merger",
+      "sourcePort": "out",
+      "target": "reviewer",
+      "targetPort": "in"
+    },
+    {
+      "id": "reviewer-to-output",
+      "source": "reviewer",
+      "sourcePort": "out",
+      "target": "output",
+      "targetPort": "in"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "createdAt": "2026-04-09T00:00:00Z",
+    "updatedAt": "2026-04-09T00:00:00Z",
+    "author": "CopilotFleet",
+    "tags": ["fullstack", "parallel", "6-agents"]
+  }
+}

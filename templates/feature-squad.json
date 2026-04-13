@@ -1,0 +1,119 @@
+{
+  "id": "feature-squad",
+  "name": "Feature Squad",
+  "description": "Sequential multi-agent pipeline for delivering a feature from planning to review.",
+  "nodes": [
+    {
+      "id": "trigger",
+      "type": "trigger",
+      "label": "Trigger",
+      "description": "Starts the feature implementation workflow.",
+      "position": { "x": 100, "y": 250 },
+      "ports": [
+        { "id": "out", "name": "Output", "type": "output", "dataType": "task" }
+      ],
+      "config": {},
+      "status": "idle"
+    },
+    {
+      "id": "planner",
+      "type": "agent",
+      "label": "Planner",
+      "description": "Breaks the request into implementation steps.",
+      "position": { "x": 350, "y": 250 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "task" },
+        { "id": "out", "name": "Output", "type": "output", "dataType": "plan" }
+      ],
+      "config": {
+        "agentId": "builtin-planner",
+        "provider": "github-copilot",
+        "model": "claude-sonnet-4"
+      },
+      "status": "idle"
+    },
+    {
+      "id": "coder",
+      "type": "agent",
+      "label": "Coder",
+      "description": "Implements the planned feature work.",
+      "position": { "x": 600, "y": 250 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "plan" },
+        { "id": "out", "name": "Output", "type": "output", "dataType": "implementation" }
+      ],
+      "config": {
+        "agentId": "builtin-coder",
+        "provider": "github-copilot",
+        "model": "claude-sonnet-4"
+      },
+      "status": "idle"
+    },
+    {
+      "id": "reviewer",
+      "type": "agent",
+      "label": "Reviewer",
+      "description": "Checks the feature for correctness and regressions.",
+      "position": { "x": 850, "y": 250 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "implementation" },
+        { "id": "out", "name": "Output", "type": "output", "dataType": "review" }
+      ],
+      "config": {
+        "agentId": "builtin-reviewer",
+        "provider": "github-copilot",
+        "model": "claude-sonnet-4"
+      },
+      "status": "idle"
+    },
+    {
+      "id": "output",
+      "type": "output",
+      "label": "Output",
+      "description": "Collects the final reviewed feature output.",
+      "position": { "x": 1100, "y": 250 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "review" }
+      ],
+      "config": {},
+      "status": "idle"
+    }
+  ],
+  "edges": [
+    {
+      "id": "trigger-to-planner",
+      "source": "trigger",
+      "sourcePort": "out",
+      "target": "planner",
+      "targetPort": "in"
+    },
+    {
+      "id": "planner-to-coder",
+      "source": "planner",
+      "sourcePort": "out",
+      "target": "coder",
+      "targetPort": "in"
+    },
+    {
+      "id": "coder-to-reviewer",
+      "source": "coder",
+      "sourcePort": "out",
+      "target": "reviewer",
+      "targetPort": "in"
+    },
+    {
+      "id": "reviewer-to-output",
+      "source": "reviewer",
+      "sourcePort": "out",
+      "target": "output",
+      "targetPort": "in"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "createdAt": "2026-04-09T00:00:00Z",
+    "updatedAt": "2026-04-09T00:00:00Z",
+    "author": "CopilotFleet",
+    "tags": ["feature", "pipeline", "3-agents"]
+  }
+}

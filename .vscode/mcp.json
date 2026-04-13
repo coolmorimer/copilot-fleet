@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "copilot-fleet": {
+      "command": "npx",
+      "args": ["@copilot-fleet/mcp-server"],
+      "tools": [
+        "launch_fleet",
+        "fleet_status",
+        "list_agents",
+        "abort_fleet",
+        "add_agent"
+      ]
+    }
+  }
+}

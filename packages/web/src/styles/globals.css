@@ -1,0 +1,111 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Theme custom properties ────────────────────────────── */
+:root {
+  --fleet-bg: #f8fafc;
+  --fleet-surface: #ffffff;
+  --fleet-panel: #f1f5f9;
+  --fleet-border: #e2e8f0;
+  --fleet-accent: #6366f1;
+  --fleet-text: #0f172a;
+  --fleet-muted: #64748b;
+  --fleet-deep: #e2e8f0;
+  color-scheme: light;
+}
+
+.dark {
+  --fleet-bg: #1a1a2e;
+  --fleet-surface: #16213e;
+  --fleet-panel: #0f3460;
+  --fleet-border: #2a2a4a;
+  --fleet-accent: #6366f1;
+  --fleet-text: #e2e8f0;
+  --fleet-muted: #94a3b8;
+  --fleet-deep: #11182e;
+  color-scheme: dark;
+}
+
+@layer base {
+  * {
+    @apply border-fleet-border;
+  }
+
+  body {
+    @apply bg-fleet-bg text-fleet-text font-sans;
+  }
+}
+
+.react-flow__background {
+  background-color: var(--fleet-bg);
+}
+
+.react-flow__minimap {
+  background-color: var(--fleet-surface);
+  border: 1px solid var(--fleet-border);
+  border-radius: 8px;
+}
+
+.react-flow__controls {
+  background: var(--fleet-surface);
+  border: 1px solid var(--fleet-border);
+  border-radius: 8px;
+}
+
+.react-flow__controls button {
+  background: var(--fleet-surface);
+  color: var(--fleet-text);
+  border-bottom: 1px solid var(--fleet-border);
+}
+
+.react-flow__controls button:hover {
+  background: var(--fleet-panel);
+}
+
+.react-flow__attribution {
+  display: none;
+}
+
+.react-flow__background pattern circle {
+  fill: var(--fleet-border);
+}
+
+.react-flow__selection {
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+}
+
+.react-flow__edge-path {
+  transition: stroke 160ms ease, filter 160ms ease;
+}
+
+@keyframes flow-dash {
+  from {
+    stroke-dashoffset: 24;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--fleet-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--fleet-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fleet-muted);
+}

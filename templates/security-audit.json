@@ -1,0 +1,152 @@
+{
+  "id": "security-audit",
+  "name": "Security Audit",
+  "description": "Conditional remediation workflow for security audits and follow-up fixes.",
+  "nodes": [
+    {
+      "id": "trigger",
+      "type": "trigger",
+      "label": "Trigger",
+      "description": "Starts the security audit workflow.",
+      "position": { "x": 100, "y": 300 },
+      "ports": [
+        { "id": "out", "name": "Output", "type": "output", "dataType": "task" }
+      ],
+      "config": {},
+      "status": "idle"
+    },
+    {
+      "id": "security",
+      "type": "agent",
+      "label": "Security",
+      "description": "Audits the target for vulnerabilities and risks.",
+      "position": { "x": 350, "y": 300 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "task" },
+        { "id": "out", "name": "Output", "type": "output", "dataType": "audit" }
+      ],
+      "config": {
+        "agentId": "builtin-security",
+        "provider": "github-copilot",
+        "model": "claude-sonnet-4"
+      },
+      "status": "idle"
+    },
+    {
+      "id": "condition",
+      "type": "condition",
+      "label": "Issues found?",
+      "description": "Branches based on whether the audit found issues.",
+      "position": { "x": 650, "y": 300 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "audit" },
+        { "id": "yes", "name": "Yes", "type": "output", "dataType": "remediation" },
+        { "id": "no", "name": "No", "type": "output", "dataType": "audit" }
+      ],
+      "config": {
+        "rule": "issuesFound"
+      },
+      "status": "idle"
+    },
+    {
+      "id": "coder",
+      "type": "agent",
+      "label": "Coder",
+      "description": "Implements fixes for confirmed security findings.",
+      "position": { "x": 950, "y": 180 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "remediation" },
+        { "id": "out", "name": "Output", "type": "output", "dataType": "fix" }
+      ],
+      "config": {
+        "agentId": "builtin-coder",
+        "provider": "github-copilot",
+        "model": "claude-sonnet-4"
+      },
+      "status": "idle"
+    },
+    {
+      "id": "reviewer",
+      "type": "agent",
+      "label": "Reviewer",
+      "description": "Reviews either the direct audit result or the applied fixes.",
+      "position": { "x": 1250, "y": 300 },
+      "ports": [
+        { "id": "in-fix", "name": "Fix path", "type": "input", "dataType": "fix" },
+        { "id": "in-audit", "name": "Audit path", "type": "input", "dataType": "audit" },
+        { "id": "out", "name": "Output", "type": "output", "dataType": "review" }
+      ],
+      "config": {
+        "agentId": "builtin-reviewer",
+        "provider": "github-copilot",
+        "model": "claude-sonnet-4"
+      },
+      "status": "idle"
+    },
+    {
+      "id": "output",
+      "type": "output",
+      "label": "Output",
+      "description": "Collects the final audit or remediation outcome.",
+      "position": { "x": 1550, "y": 300 },
+      "ports": [
+        { "id": "in", "name": "Input", "type": "input", "dataType": "review" }
+      ],
+      "config": {},
+      "status": "idle"
+    }
+  ],
+  "edges": [
+    {
+      "id": "trigger-to-security",
+      "source": "trigger",
+      "sourcePort": "out",
+      "target": "security",
+      "targetPort": "in"
+    },
+    {
+      "id": "security-to-condition",
+      "source": "security",
+      "sourcePort": "out",
+      "target": "condition",
+      "targetPort": "in"
+    },
+    {
+      "id": "condition-yes-to-coder",
+      "source": "condition",
+      "sourcePort": "yes",
+      "target": "coder",
+      "targetPort": "in",
+      "label": "yes"
+    },
+    {
+      "id": "condition-no-to-reviewer",
+      "source": "condition",
+      "sourcePort": "no",
+      "target": "reviewer",
+      "targetPort": "in-audit",
+      "label": "no"
+    },
+    {
+      "id": "coder-to-reviewer",
+      "source": "coder",
+      "sourcePort": "out",
+      "target": "reviewer",
+      "targetPort": "in-fix"
+    },
+    {
+      "id": "reviewer-to-output",
+      "source": "reviewer",
+      "sourcePort": "out",
+      "target": "output",
+      "targetPort": "in"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "createdAt": "2026-04-09T00:00:00Z",
+    "updatedAt": "2026-04-09T00:00:00Z",
+    "author": "CopilotFleet",
+    "tags": ["security", "audit", "conditional"]
+  }
+}

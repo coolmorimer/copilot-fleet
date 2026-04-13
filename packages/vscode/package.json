@@ -1,0 +1,176 @@
+{
+  "name": "copilot-fleet",
+  "displayName": "CopilotFleet — Visual Agent Orchestration",
+  "description": "Visual node-graph orchestration of AI agents with drag-and-drop, parallel execution, and real-time progress tracking.",
+  "version": "0.1.0",
+  "publisher": "copilot-fleet",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "AI",
+    "Chat",
+    "Other"
+  ],
+  "keywords": [
+    "copilot",
+    "fleet",
+    "agents",
+    "orchestration",
+    "node-graph"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "icon": "media/icon.png",
+  "contributes": {
+    "commands": [
+      {
+        "command": "copilot-fleet.openGraph",
+        "title": "Open Graph Editor",
+        "category": "Fleet",
+        "icon": "$(symbol-misc)"
+      },
+      {
+        "command": "copilot-fleet.run",
+        "title": "Run Fleet",
+        "category": "Fleet",
+        "icon": "$(play)"
+      },
+      {
+        "command": "copilot-fleet.stop",
+        "title": "Stop Fleet",
+        "category": "Fleet",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "copilot-fleet.status",
+        "title": "Show Status",
+        "category": "Fleet",
+        "icon": "$(info)"
+      },
+      {
+        "command": "copilot-fleet.openSidebar",
+        "title": "Open Sidebar",
+        "category": "Fleet"
+      },
+      {
+        "command": "copilot-fleet.loadTemplate",
+        "title": "Load Template",
+        "category": "Fleet",
+        "icon": "$(file-symlink-directory)"
+      },
+      {
+        "command": "copilot-fleet.listAgents",
+        "title": "List Agents",
+        "category": "Fleet"
+      },
+      {
+        "command": "copilot-fleet.abort",
+        "title": "Abort Session",
+        "category": "Fleet",
+        "icon": "$(close)"
+      }
+    ],
+    "chatParticipants": [
+      {
+        "id": "copilot-fleet.fleet",
+        "fullName": "CopilotFleet",
+        "name": "fleet",
+        "description": "Visual AI agent orchestration — run parallel agent workflows",
+        "isSticky": true,
+        "commands": [
+          {
+            "name": "run",
+            "description": "Run fleet orchestration on a task"
+          },
+          {
+            "name": "plan",
+            "description": "Plan task decomposition (dry run)"
+          },
+          {
+            "name": "status",
+            "description": "Show current session status"
+          },
+          {
+            "name": "abort",
+            "description": "Abort the running session"
+          },
+          {
+            "name": "graph",
+            "description": "Open the visual graph editor"
+          },
+          {
+            "name": "agents",
+            "description": "List available agents"
+          },
+          {
+            "name": "templates",
+            "description": "Show available graph templates"
+          }
+        ]
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "copilot-fleet",
+          "title": "CopilotFleet",
+          "icon": "media/fleet-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "copilot-fleet": [
+        {
+          "type": "webview",
+          "id": "copilot-fleet.sidebar",
+          "name": "Fleet Dashboard"
+        }
+      ]
+    },
+    "menus": {
+      "commandPalette": [
+        { "command": "copilot-fleet.openGraph" },
+        { "command": "copilot-fleet.run" },
+        { "command": "copilot-fleet.stop" },
+        { "command": "copilot-fleet.status" },
+        { "command": "copilot-fleet.loadTemplate" },
+        { "command": "copilot-fleet.listAgents" },
+        { "command": "copilot-fleet.abort" }
+      ],
+      "editor/title": [
+        {
+          "command": "copilot-fleet.openGraph",
+          "group": "navigation",
+          "when": "resourceExtname == .fleet"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "copilot-fleet.openGraph",
+        "key": "ctrl+shift+f",
+        "mac": "cmd+shift+f",
+        "when": "!editorFocus"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "dev": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf dist",
+    "package": "vsce package --no-dependencies"
+  },
+  "dependencies": {
+    "@copilot-fleet/shared": "workspace:*",
+    "@copilot-fleet/core": "workspace:*",
+    "@copilot-fleet/agents": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.96.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0"
+  }
+}
